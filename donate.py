@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import time
+from io import BytesIO
+from fpdf import FPDF
 
 # Page configuration
 st.set_page_config(
@@ -14,39 +16,164 @@ st.set_page_config(
 # Custom CSS for styling
 st.markdown("""
 <style>
+    html, body, .stApp {
+        font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+        background: linear-gradient(135deg, #101418 0%, #181c20 100%) !important;
+        color: #f8fff8 !important;
+    }
+    .block-container {
+        max-width: 900px !important;
+        margin: 0 auto !important;
+        padding: 2.5rem 2rem 2.5rem 2rem !important;
+        background: #181c20 !important;
+        border-radius: 18px !important;
+        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.25);
+    }
     .main-header {
-        font-size: 3rem;
-        color: #1f4e79;
+        font-size: 3.2rem;
+        color: #eaffd0;
         text-align: center;
-        margin-bottom: 2rem;
-        font-weight: bold;
+        margin-bottom: 2.2rem;
+        font-weight: 800;
+        text-shadow: 0 2px 12px #081c15;
+        letter-spacing: 1.5px;
+        padding-top: 0.5rem;
     }
     .subtitle {
-        font-size: 1.5rem;
-        color: #2c5282;
+        font-size: 1.35rem;
+        color: #b7e4c7;
         text-align: center;
-        margin-bottom: 3rem;
+        margin-bottom: 2.5rem;
+        font-weight: 500;
     }
-    .donation-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 10px;
-        color: white;
-        margin: 1rem 0;
+    .section-divider {
+        border: none;
+        border-top: 2px solid #40916c;
+        margin: 2.5rem 0 2rem 0;
+    }
+    .donation-card, .stats-card, .success-message {
+        background: #23272b !important;
+        color: #f8fff8 !important;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18);
+        margin: 1.5rem 0;
+        padding: 2rem 2rem 1.5rem 2rem;
+        transition: box-shadow 0.2s;
+    }
+    .donation-card:hover, .stats-card:hover {
+        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.28);
     }
     .stats-card {
-        background: #f7fafc;
-        padding: 1.5rem;
-        border-radius: 8px;
-        border-left: 4px solid #4299e1;
-        margin: 1rem 0;
+        background: #181c20 !important;
+        border-left: 6px solid #40916c;
+        padding: 1.5rem 2rem;
+        margin: 1.2rem 0;
     }
     .success-message {
-        background: #c6f6d5;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #38a169;
-        color: #22543d;
+        background: #183a1d !important;
+        border-left: 6px solid #38b000;
+        color: #eaffd0 !important;
+        font-weight: 600;
+    }
+    .stButton>button {
+        background: linear-gradient(90deg, #204529 0%, #40916c 100%) !important;
+        color: #f8fff8 !important;
+        border: none !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        font-size: 1.15rem !important;
+        padding: 0.8rem 2rem !important;
+        box-shadow: 0 2px 8px 0 rgba(0,0,0,0.18);
+        margin-top: 0.7rem;
+        transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    }
+    .stButton>button:hover {
+        background: linear-gradient(90deg, #38b000 0%, #081c15 100%) !important;
+        color: #eaffd0 !important;
+        box-shadow: 0 4px 16px 0 rgba(0,0,0,0.28);
+    }
+    .stTextInput>div>input, .stTextInput>div>textarea {
+        background: #23272b !important;
+        color: #eaffd0 !important;
+        border-radius: 10px !important;
+        border: 2px solid #40916c !important;
+        font-size: 1.05rem !important;
+        padding: 0.6rem 1.1rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    .stDataFrame, .stDataFrame table {
+        background: #181c20 !important;
+        color: #eaffd0 !important;
+        border-radius: 10px !important;
+        font-size: 1.05rem !important;
+    }
+    .stMetric {
+        background: #23272b !important;
+        color: #eaffd0 !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+        margin-bottom: 1rem !important;
+    }
+    .stSelectbox>div>div, .stMultiSelect>div>div {
+        background: #23272b !important;
+        color: #eaffd0 !important;
+        border-radius: 10px !important;
+        font-size: 1.05rem !important;
+    }
+    .stNumberInput>div>input {
+        background: #23272b !important;
+        color: #eaffd0 !important;
+        border-radius: 10px !important;
+        border: 2px solid #40916c !important;
+        font-size: 1.05rem !important;
+    }
+    .stSidebar {
+        background: #181c20 !important;
+        color: #eaffd0 !important;
+        border-right: 2px solid #40916c;
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+        border-radius: 0 18px 18px 0 !important;
+        box-shadow: 2px 0 16px 0 rgba(0,0,0,0.18);
+    }
+    .stExpanderHeader {
+        background: #23272b !important;
+        color: #eaffd0 !important;
+        border-radius: 10px 10px 0 0 !important;
+        font-weight: 600;
+    }
+    .stExpanderContent {
+        background: #181c20 !important;
+        color: #eaffd0 !important;
+        border-radius: 0 0 10px 10px !important;
+    }
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        background: #23272b;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #40916c;
+        border-radius: 4px;
+    }
+    /* Form tweaks */
+    .stForm {
+        margin-top: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+        padding: 1.5rem 1.5rem 1rem 1.5rem !important;
+        background: #23272b !important;
+        border-radius: 14px !important;
+        box-shadow: 0 2px 12px 0 rgba(0,0,0,0.18);
+    }
+    /* Responsive tweaks */
+    @media (max-width: 900px) {
+        .block-container {
+            padding: 1rem !important;
+        }
+        .main-header {
+            font-size: 2.1rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -101,6 +228,7 @@ def main():
     # Header
     st.markdown('<h1 class="main-header">🎓 Global Education Inequality Ball</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">A Biannual Gala for Global Education Equality</p>', unsafe_allow_html=True)
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
     
     # Sidebar
     with st.sidebar:
@@ -162,6 +290,7 @@ def login_section():
 def main_dashboard():
     # Event Information
     st.header("🌍 About the Global Education Inequality Ball")
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
     
     col1, col2 = st.columns([2, 1])
     
@@ -191,9 +320,25 @@ def main_dashboard():
             </ul>
         </div>
         """, unsafe_allow_html=True)
+
+    # Top Donors Leaderboard (Sample Data)
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    st.subheader("🏆 Top Donors Leaderboard")
+    leaderboard_data = [
+        {"Name": "Ava Smith", "Amount": 50000},
+        {"Name": "Liam Chen", "Amount": 35000},
+        {"Name": "Noah Patel", "Amount": 25000},
+        {"Name": "Sophia Lee", "Amount": 20000},
+        {"Name": "You", "Amount": st.session_state.total_donations},
+    ]
+    leaderboard_df = pd.DataFrame(leaderboard_data).sort_values(by="Amount", ascending=False).reset_index(drop=True)
+    st.markdown('<div class="donation-card">', unsafe_allow_html=True)
+    st.table(leaderboard_df.style.format({"Amount": "$ {:,.0f}"}))
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Donation Section
     st.header("💰 Make Your Impact")
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
     st.write("**Minimum donation of $5,000 required to secure your exclusive gala ticket.**")
     
     # Organization selection
@@ -262,6 +407,7 @@ def main_dashboard():
                 "frequency": donation_frequency
             }
             st.session_state.donation_history.append(donation_record)
+            st.session_state.last_donation = donation_record
             
             # Success message
             st.balloons()
@@ -272,16 +418,41 @@ def main_dashboard():
                 <p>Your exclusive gala ticket has been secured!</p>
             </div>
             """, unsafe_allow_html=True)
-            
-            time.sleep(2)
-            st.rerun()
         
         elif submit_donation and donation_amount < 5000:
             st.error("❌ Minimum donation of $5,000 required to secure your gala ticket.")
+
+    # Show PDF download button after form, if last_donation is set
+    if 'last_donation' in st.session_state and st.session_state.last_donation:
+        def generate_pdf_receipt(donation, user_name):
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=16)
+            pdf.cell(0, 12, "Donation Receipt", ln=True, align="C")
+            pdf.set_font("Arial", size=12)
+            pdf.ln(8)
+            pdf.cell(0, 10, f"Date: {donation['date']}", ln=True)
+            pdf.cell(0, 10, f"Donor: {user_name}", ln=True)
+            pdf.cell(0, 10, f"Amount: ${donation['amount']:,}", ln=True)
+            pdf.cell(0, 10, f"Organizations: {', '.join(donation['organizations'])}", ln=True)
+            pdf.cell(0, 10, f"Donation Type: {donation['frequency']}", ln=True)
+            pdf.ln(8)
+            pdf.multi_cell(0, 10, "Thank you for your generous support of global education equality!\nThis receipt can be used for your records.")
+            return pdf.output(dest='S').encode('latin1')
+        pdf_bytes = generate_pdf_receipt(st.session_state.last_donation, st.session_state.user_name)
+        if pdf_bytes:
+            st.download_button(
+                label="📄 Download Donation Receipt (PDF)",
+                data=pdf_bytes,
+                file_name=f"donation_receipt_{st.session_state.last_donation['date']}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
     
     # Ticket Status
     if st.session_state.ticket_purchased:
         st.header("🎫 Your Gala Ticket")
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
         ticket_col1, ticket_col2 = st.columns([1, 1])
         
         with ticket_col1:
@@ -305,10 +476,40 @@ def main_dashboard():
             - **Awards**: Global Education Champions
             - **Networking**: 500+ philanthropists & leaders
             """)
+
+        # RSVP & Table Selection
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+        st.subheader("🍽️ RSVP & Table Selection")
+        if 'rsvp_info' not in st.session_state:
+            with st.form("rsvp_form"):
+                meal = st.selectbox("Meal Preference", ["Vegetarian", "Vegan", "Chicken", "Fish", "Beef", "Gluten-Free"])
+                table = st.number_input("Preferred Table Number (1-50)", min_value=1, max_value=50, value=1)
+                special = st.text_area("Special Requests (optional)")
+                submit_rsvp = st.form_submit_button("RSVP Now", use_container_width=True)
+                if submit_rsvp:
+                    st.session_state.rsvp_info = {
+                        "meal": meal,
+                        "table": table,
+                        "special": special
+                    }
+                    st.success("Your RSVP has been received! We look forward to seeing you at the gala.")
+        else:
+            rsvp = st.session_state.rsvp_info
+            st.markdown(f"""
+            <div class="donation-card">
+                <h4>✅ RSVP Confirmed</h4>
+                <ul>
+                    <li><strong>Meal:</strong> {rsvp['meal']}</li>
+                    <li><strong>Table:</strong> {rsvp['table']}</li>
+                    <li><strong>Special Requests:</strong> {rsvp['special'] if rsvp['special'] else 'None'}</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
     
     # Donation History
     if st.session_state.donation_history:
         st.header("📊 Your Impact History")
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
         
         # Create DataFrame for history
         df = pd.DataFrame(st.session_state.donation_history)
